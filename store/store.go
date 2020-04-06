@@ -11,9 +11,10 @@ import (
 )
 
 type Store struct {
-	dir string
-	f   *os.File
-	mm  mmap.MMap
+	dir         string
+	f           *os.File
+	mm          mmap.MMap
+	currentSize uint64
 }
 
 func Open(dir string, maxSize int) (*Store, error) {
@@ -28,13 +29,16 @@ func Open(dir string, maxSize int) (*Store, error) {
 		return nil, errors.Wrapf(err, "while getting stats of file %s", storeFileName)
 	}
 
-	if st.Size() == 0 {
+	currentSize := uint64(st.Size())
+
+	if currentSize == 0 {
 		header := make([]byte, 16)
 		binary.BigEndian.PutUint64(header, 16)
 		_, err = f.Write(header)
 		if err != nil {
 			return nil, errors.Wrapf(err, "while appending header to %s", storeFileName)
 		}
+		currentSize = 16
 	}
 
 	mm, err := mmap.MapRegion(f, maxSize, mmap.RDWR, 0, 0)
@@ -49,9 +53,10 @@ func Open(dir string, maxSize int) (*Store, error) {
 	}
 
 	return &Store{
-		dir: dir,
-		f:   f,
-		mm:  mm,
+		dir:         dir,
+		f:           f,
+		mm:          mm,
+		currentSize: currentSize,
 	}, nil
 
 }
@@ -68,4 +73,41 @@ func (s *Store) Close() error {
 	}
 
 	return nil
+}
+
+const sizeIncrease = 16 * 1024 * 1024
+
+func (s *Store) Allocate(size int) (uint64, Block, error) {
+	nfa := s.nextFreeAddress()
+	end := nfa + uint64(size+2)
+	if end > s.currentSize {
+		missing := s.currentSize - end
+		toAppend := missing / sizeIncrease
+
+		if (missing % sizeIncrease) > 0 {
+			toAppend++
+		}
+
+		toAppend *= sizeIncrease
+
+		err := s.f.Truncate(int64(s.currentSize + toAppend))
+		if err != nil {
+			return 0, nil, errors.Wrapf(err, "while increasing store by %d bytes", toAppend)
+		}
+
+		s.currentSize += toAppend
+	}
+
+	binary.BigEndian.PutUint64(s.mm, end)
+
+	return nfa, newBlock(s.mm[nfa:end]), nil
+
+}
+
+func (s *Store) nextFreeAddress() uint64 {
+	return binary.BigEndian.Uint64(s.mm)
+}
+
+func (s *Store) GetBlock(addr uint64) Block {
+	return toBlock(s.mm[addr:])
 }
