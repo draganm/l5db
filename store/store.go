@@ -108,6 +108,10 @@ func (s *Store) nextFreeAddress() uint64 {
 	return binary.BigEndian.Uint64(s.mm)
 }
 
-func (s *Store) GetBlock(addr uint64) Block {
+func (s *Store) GetBlock(addr uint64) (Block, error) {
+	if addr >= s.nextFreeAddress()-2 {
+		return nil, errors.New("block is past the highest address")
+	}
+
 	return toBlock(s.mm[addr:])
 }

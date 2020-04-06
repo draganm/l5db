@@ -49,7 +49,8 @@ func TestAllocate(t *testing.T) {
 	require.NoError(t, err)
 	defer st.Close()
 
-	bl = st.GetBlock(addr)
+	bl, err = st.GetBlock(addr)
+	require.NoError(t, err)
 
 	require.Equal(t, []byte{1, 2, 3}, bl.Data())
 

@@ -1,6 +1,10 @@
 package store
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+
+	"github.com/pkg/errors"
+)
 
 type Block []byte
 
@@ -13,7 +17,10 @@ func (b Block) Data() []byte {
 	return b[2:]
 }
 
-func toBlock(d []byte) Block {
-	len := binary.BigEndian.Uint16(d)
-	return d[:len]
+func toBlock(d []byte) (Block, error) {
+	l := binary.BigEndian.Uint16(d)
+	if len(d) < int(l) {
+		return nil, errors.New("underlying block slice is too short")
+	}
+	return d[:l], nil
 }
