@@ -37,10 +37,10 @@ func TestAllocate(t *testing.T) {
 
 	addr, bl, err := st.Allocate(3, store.BTreeMetaBlockType)
 	require.NoError(t, err)
-	require.Equal(t, 3, len(bl.Data()))
-	require.Equal(t, store.Address(16), addr)
+	require.Equal(t, 3, len(bl))
+	require.Equal(t, store.Address(19), addr)
 
-	copy(bl.Data(), []byte{1, 2, 3})
+	copy(bl, []byte{1, 2, 3})
 
 	err = st.Close()
 	require.NoError(t, err)
@@ -49,9 +49,10 @@ func TestAllocate(t *testing.T) {
 	require.NoError(t, err)
 	defer st.Close()
 
-	bl, err = st.GetBlock(addr)
+	bl, bt, err := st.GetBlock(addr)
 	require.NoError(t, err)
+	require.Equal(t, store.BTreeMetaBlockType, bt)
 
-	require.Equal(t, []byte{1, 2, 3}, bl.Data())
+	require.Equal(t, []byte{1, 2, 3}, bl)
 
 }

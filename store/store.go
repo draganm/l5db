@@ -19,7 +19,7 @@ type Store struct {
 
 func Open(dir string, maxSize int) (*Store, error) {
 	storeFileName := filepath.Join(dir, "db")
-	f, err := os.OpenFile(storeFileName, os.O_CREATE|os.O_RDWR, 0600)
+	f, err := os.OpenFile(storeFileName, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0600)
 	if err != nil {
 		return nil, errors.Wrapf(err, "while opening file %s", storeFileName)
 	}
@@ -77,7 +77,7 @@ func (s *Store) Close() error {
 
 const sizeIncrease = 16 * 1024 * 1024
 
-func (s *Store) Allocate(size int, t BlockType) (Address, Block, error) {
+func (s *Store) Allocate(size int, t BlockType) (Address, []byte, error) {
 	nfa := s.nextFreeAddress().UInt64()
 	end := nfa + uint64(size+3)
 	if end > s.currentSize {
@@ -98,9 +98,14 @@ func (s *Store) Allocate(size int, t BlockType) (Address, Block, error) {
 		s.currentSize += toAppend
 	}
 
+	// DON'T REMOVE: write new NFA
 	binary.BigEndian.PutUint64(s.mm, end)
 
-	return Address(nfa), newBlock(s.mm[nfa:end], t), nil
+	binary.BigEndian.PutUint16(s.mm[nfa:], uint16(size+3))
+
+	s.mm[nfa+2] = byte(t)
+
+	return Address(nfa + 3), s.mm[nfa+3 : end], nil
 
 }
 
@@ -108,12 +113,20 @@ func (s *Store) nextFreeAddress() Address {
 	return Address(binary.BigEndian.Uint64(s.mm))
 }
 
-func (s *Store) GetBlock(addr Address) (Block, error) {
-	if addr >= s.nextFreeAddress()-2 {
-		return nil, errors.New("block is past the highest address")
+func (s *Store) GetBlock(addr Address) ([]byte, BlockType, error) {
+	nfa := s.nextFreeAddress()
+	if addr >= nfa {
+		return nil, 0, errors.New("block is past the highest address")
 	}
 
-	return toBlock(s.mm[addr:])
+	bld := s.mm[addr-3:]
+
+	l := binary.BigEndian.Uint16(bld)
+
+	bld = bld[:l]
+	t := BlockType(bld[2])
+
+	return bld[3:], t, nil
 }
 
 func (s *Store) Free(Address) error {
@@ -121,6 +134,6 @@ func (s *Store) Free(Address) error {
 }
 
 type BlockAllocator interface {
-	Allocate(size int, t BlockType) (Address, Block, error)
+	Allocate(size int, t BlockType) (Address, []byte, error)
 	Free(Address) error
 }
