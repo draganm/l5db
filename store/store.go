@@ -121,6 +121,6 @@ func (s *Store) Free(Address) error {
 }
 
 type BlockAllocator interface {
-	Allocate(size int) (Address, Block, error)
+	Allocate(size int, t BlockType) (Address, Block, error)
 	Free(Address) error
 }
