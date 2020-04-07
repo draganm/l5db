@@ -38,7 +38,7 @@ func TestAllocate(t *testing.T) {
 	addr, bl, err := st.Allocate(3)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(bl.Data()))
-	require.Equal(t, uint64(16), addr)
+	require.Equal(t, store.Address(16), addr)
 
 	copy(bl.Data(), []byte{1, 2, 3})
 

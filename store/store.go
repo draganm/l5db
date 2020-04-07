@@ -77,8 +77,8 @@ func (s *Store) Close() error {
 
 const sizeIncrease = 16 * 1024 * 1024
 
-func (s *Store) Allocate(size int) (uint64, Block, error) {
-	nfa := s.nextFreeAddress()
+func (s *Store) Allocate(size int) (Address, Block, error) {
+	nfa := s.nextFreeAddress().UInt64()
 	end := nfa + uint64(size+2)
 	if end > s.currentSize {
 		missing := s.currentSize - end
@@ -100,18 +100,27 @@ func (s *Store) Allocate(size int) (uint64, Block, error) {
 
 	binary.BigEndian.PutUint64(s.mm, end)
 
-	return nfa, newBlock(s.mm[nfa:end]), nil
+	return Address(nfa), newBlock(s.mm[nfa:end]), nil
 
 }
 
-func (s *Store) nextFreeAddress() uint64 {
-	return binary.BigEndian.Uint64(s.mm)
+func (s *Store) nextFreeAddress() Address {
+	return Address(binary.BigEndian.Uint64(s.mm))
 }
 
-func (s *Store) GetBlock(addr uint64) (Block, error) {
+func (s *Store) GetBlock(addr Address) (Block, error) {
 	if addr >= s.nextFreeAddress()-2 {
 		return nil, errors.New("block is past the highest address")
 	}
 
 	return toBlock(s.mm[addr:])
+}
+
+func (s *Store) Free(Address) error {
+	return errors.New("not yet implemented")
+}
+
+type BlockAllocator interface {
+	Allocate(size int) (Address, Block, error)
+	Free(Address) error
 }
