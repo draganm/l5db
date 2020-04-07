@@ -77,9 +77,9 @@ func (s *Store) Close() error {
 
 const sizeIncrease = 16 * 1024 * 1024
 
-func (s *Store) Allocate(size int) (Address, Block, error) {
+func (s *Store) Allocate(size int, t BlockType) (Address, Block, error) {
 	nfa := s.nextFreeAddress().UInt64()
-	end := nfa + uint64(size+2)
+	end := nfa + uint64(size+3)
 	if end > s.currentSize {
 		missing := s.currentSize - end
 		toAppend := missing / sizeIncrease
@@ -100,7 +100,7 @@ func (s *Store) Allocate(size int) (Address, Block, error) {
 
 	binary.BigEndian.PutUint64(s.mm, end)
 
-	return Address(nfa), newBlock(s.mm[nfa:end]), nil
+	return Address(nfa), newBlock(s.mm[nfa:end], t), nil
 
 }
 

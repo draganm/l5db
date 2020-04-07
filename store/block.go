@@ -8,13 +8,14 @@ import (
 
 type Block []byte
 
-func newBlock(d []byte) Block {
+func newBlock(d []byte, t BlockType) Block {
 	binary.BigEndian.PutUint16(d, uint16(len(d)))
+	d[2] = byte(t)
 	return d
 }
 
 func (b Block) Data() []byte {
-	return b[2:]
+	return b[3:]
 }
 
 func toBlock(d []byte) (Block, error) {

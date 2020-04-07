@@ -35,7 +35,7 @@ func TestAllocate(t *testing.T) {
 	st, err := store.Open(td, 1024)
 	require.NoError(t, err)
 
-	addr, bl, err := st.Allocate(3)
+	addr, bl, err := st.Allocate(3, store.BTreeMetaBlockType)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(bl.Data()))
 	require.Equal(t, store.Address(16), addr)
