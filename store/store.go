@@ -77,14 +77,14 @@ func (s *Store) Close() error {
 
 const sizeIncrease = 16 * 1024 * 1024
 
-func (s *Store) Allocate(size int, t BlockType) (Address, []byte, error) {
+func (s *Store) Allocate(size int, t BlockType) (Address, error) {
 	nfa := s.nextFreeAddress().UInt64()
 	end := nfa + uint64(size+3)
 	if end > s.currentSize {
-		missing := s.currentSize - end
+		missing := end - s.currentSize
 		toAppend := missing / sizeIncrease
 
-		if (missing % sizeIncrease) > 0 {
+		if (missing % sizeIncrease) != 0 {
 			toAppend++
 		}
 
@@ -92,25 +92,25 @@ func (s *Store) Allocate(size int, t BlockType) (Address, []byte, error) {
 
 		err := s.f.Truncate(int64(s.currentSize + toAppend))
 		if err != nil {
-			return 0, nil, errors.Wrapf(err, "while increasing store by %d bytes", toAppend)
+			return 0, errors.Wrapf(err, "while increasing store by %d bytes", toAppend)
 		}
 
 		s.currentSize += toAppend
 	}
 
 	// DON'T REMOVE: write new NFA
-	binary.BigEndian.PutUint64(s.mm, end)
+	binary.BigEndian.PutUint64(s.mm[:8], end)
 
-	binary.BigEndian.PutUint16(s.mm[nfa:], uint16(size+3))
+	binary.BigEndian.PutUint16(s.mm[nfa:nfa+2], uint16(size+3))
 
 	s.mm[nfa+2] = byte(t)
 
-	return Address(nfa + 3), s.mm[nfa+3 : end], nil
+	return Address(nfa + 3), nil
 
 }
 
 func (s *Store) nextFreeAddress() Address {
-	return Address(binary.BigEndian.Uint64(s.mm))
+	return Address(binary.BigEndian.Uint64(s.mm[:8]))
 }
 
 func (s *Store) GetBlock(addr Address) ([]byte, BlockType, error) {
@@ -124,16 +124,45 @@ func (s *Store) GetBlock(addr Address) ([]byte, BlockType, error) {
 	l := binary.BigEndian.Uint16(bld)
 
 	bld = bld[:l]
+	if len(bld) < 3 {
+		return nil, 0, errors.New("block is too short")
+	}
 	t := BlockType(bld[2])
 
-	return bld[3:], t, nil
+	cp := make([]byte, len(bld)-3)
+
+	copy(cp, bld[3:])
+
+	return cp, t, nil
 }
 
 func (s *Store) Free(Address) error {
 	return errors.New("not yet implemented")
 }
 
-type BlockAllocator interface {
-	Allocate(size int, t BlockType) (Address, []byte, error)
+func (s *Store) Update(addr Address, d []byte) error {
+	bld := s.mm[addr-3:]
+
+	l := binary.BigEndian.Uint16(bld)
+
+	bld = bld[:l]
+	if len(bld) < 3 {
+		return errors.New("block is too short")
+	}
+
+	b := bld[3:]
+	if len(d) > len(b) {
+		return errors.New("update data is larger than block")
+	}
+
+	copy(b, d)
+
+	return nil
+}
+
+type Memory interface {
+	Allocate(size int, t BlockType) (Address, error)
 	Free(Address) error
+	GetBlock(addr Address) ([]byte, BlockType, error)
+	Update(Address, []byte) error
 }
