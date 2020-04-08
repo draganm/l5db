@@ -6,7 +6,7 @@ import (
 
 // type BtreeNode store.Block
 
-func CreateEmptyBTree(a store.BlockAllocator, t byte, keySizeHint uint16) (store.Address, error) {
+func CreateEmptyBTree(a store.Memory, t byte, keySizeHint uint16) (store.Address, error) {
 
 	mda, m, err := createMeta(a, t, keySizeHint)
 	if err != nil {

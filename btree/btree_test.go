@@ -41,3 +41,15 @@ func TestCreateEmptyBTRee(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, store.NilAddress, a)
 }
+
+func XTestCreatePutIntoEmptyTree(t *testing.T) {
+	ts, cleanup := createTestStore(t)
+	defer cleanup()
+
+	a, err := btree.CreateEmptyBTree(ts, 2, 32)
+	require.NoError(t, err)
+	require.NotEqual(t, store.NilAddress, a)
+
+	err = btree.Put(ts, a, []byte{1, 2, 3}, store.Address(666))
+	require.NoError(t, err)
+}

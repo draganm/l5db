@@ -77,7 +77,7 @@ func (s *Store) Close() error {
 
 const sizeIncrease = 16 * 1024 * 1024
 
-func (s *Store) Allocate(size int, t BlockType) (Address, error) {
+func (s *Store) Allocate(size int, t BlockType) (Address, []byte, error) {
 	nfa := s.nextFreeAddress().UInt64()
 	end := nfa + uint64(size+3)
 	if end > s.currentSize {
@@ -92,7 +92,7 @@ func (s *Store) Allocate(size int, t BlockType) (Address, error) {
 
 		err := s.f.Truncate(int64(s.currentSize + toAppend))
 		if err != nil {
-			return 0, errors.Wrapf(err, "while increasing store by %d bytes", toAppend)
+			return 0, nil, errors.Wrapf(err, "while increasing store by %d bytes", toAppend)
 		}
 
 		s.currentSize += toAppend
@@ -105,7 +105,7 @@ func (s *Store) Allocate(size int, t BlockType) (Address, error) {
 
 	s.mm[nfa+2] = byte(t)
 
-	return Address(nfa + 3), nil
+	return Address(nfa + 3), s.mm[nfa+3 : nfa+3+uint64(size)], nil
 
 }
 
@@ -140,29 +140,13 @@ func (s *Store) Free(Address) error {
 	return errors.New("not yet implemented")
 }
 
-func (s *Store) Update(addr Address, d []byte) error {
-	bld := s.mm[addr-3:]
-
-	l := binary.BigEndian.Uint16(bld)
-
-	bld = bld[:l]
-	if len(bld) < 3 {
-		return errors.New("block is too short")
-	}
-
-	b := bld[3:]
-	if len(d) > len(b) {
-		return errors.New("update data is larger than block")
-	}
-
-	copy(b, d)
-
+func (s *Store) Touch(addr Address) error {
 	return nil
 }
 
 type Memory interface {
-	Allocate(size int, t BlockType) (Address, error)
+	Allocate(size int, t BlockType) (Address, []byte, error)
 	Free(Address) error
 	GetBlock(addr Address) ([]byte, BlockType, error)
-	Update(Address, []byte) error
+	Touch(Address) error
 }
