@@ -37,6 +37,23 @@ func createMeta(m store.Memory, t byte, keySizeHint uint16) (store.Address, meta
 	}, nil
 }
 
+func getMetaNode(m store.Memory, a store.Address) (meta, error) {
+	b, t, err := m.GetBlock(a)
+	if err != nil {
+		return meta{}, errors.Wrap(err, "while getting btree meta block")
+	}
+
+	if t != store.BTreeMetaBlockType {
+		return meta{}, errors.Wrap(err, "block is not btree meta block")
+	}
+
+	return meta{
+		m:    m,
+		addr: a,
+		bl:   b,
+	}, nil
+}
+
 func (m meta) count() uint64 {
 	return binary.BigEndian.Uint64(m.bl)
 }
@@ -81,23 +98,7 @@ func (m meta) put(key []byte, value store.Address) error {
 }
 
 func (m meta) getRootNode() (btreeNode, error) {
-	ad := m.root()
-	bl, tp, err := m.m.GetBlock(ad)
-	if err != nil {
-		return nil, err
-	}
-
-	if tp != store.BTreeLeafBlockType {
-		return nil, errors.New("TODO: support more than a leaf")
-	}
-
-	l := leaf{
-		m:    m.m,
-		addr: ad,
-		bl:   bl,
-	}
-
-	return l, nil
+	return getNode(m.m, m.root())
 }
 
 func (m meta) get(key []byte) (store.Address, error) {
