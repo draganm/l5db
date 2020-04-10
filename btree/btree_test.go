@@ -56,4 +56,8 @@ func TestCreatePutIntoEmptyTree(t *testing.T) {
 	ga, err := btree.Get(ts, a, []byte{1, 2, 3})
 	require.NoError(t, err)
 	require.Equal(t, ga, store.Address(666))
+
+	cnt, err := btree.Count(ts, a)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), cnt)
 }
