@@ -15,7 +15,11 @@ func Put(m store.Memory, a store.Address, key []byte, value store.Address) error
 		return errors.Wrap(err, "block is not btree meta block")
 	}
 
-	met := meta(b)
+	met := meta{
+		m:    m,
+		addr: a,
+		bl:   b,
+	}
 
-	return met.put(m, a, key, value)
+	return met.put(key, value)
 }

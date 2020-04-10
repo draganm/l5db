@@ -114,6 +114,11 @@ func (s *Store) nextFreeAddress() Address {
 }
 
 func (s *Store) GetBlock(addr Address) ([]byte, BlockType, error) {
+
+	if addr == NilAddress {
+		return nil, 0, errors.New("trying to get block with NIL address")
+	}
+
 	nfa := s.nextFreeAddress()
 	if addr >= nfa {
 		return nil, 0, errors.New("block is past the highest address")
@@ -129,11 +134,7 @@ func (s *Store) GetBlock(addr Address) ([]byte, BlockType, error) {
 	}
 	t := BlockType(bld[2])
 
-	cp := make([]byte, len(bld)-3)
-
-	copy(cp, bld[3:])
-
-	return cp, t, nil
+	return bld[3:], t, nil
 }
 
 func (s *Store) Free(Address) error {
