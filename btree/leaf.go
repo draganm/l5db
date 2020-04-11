@@ -10,13 +10,15 @@ import (
 )
 
 type leaf struct {
-	m    store.Memory
-	addr store.Address
-	bl   []byte
+	m           store.Memory
+	addr        store.Address
+	bl          []byte
+	t           byte
+	keySizeHint uint16
 }
 
 // leaf layout:
-// 1 byte - number of children
+// 1 byte - key count
 //  2 bytes - key length
 //  key bytes
 //  8 bytes child address
@@ -31,30 +33,32 @@ func createEmptyLeaf(m store.Memory, t byte, keySizeHint uint16) (store.Address,
 	m.Touch(ad)
 
 	return ad, leaf{
-		m:    m,
-		addr: ad,
-		bl:   bl,
+		m:           m,
+		addr:        ad,
+		bl:          bl,
+		t:           t,
+		keySizeHint: keySizeHint,
 	}, nil
 }
 
 func (l leaf) put(key []byte, value store.Address) (store.Address, bool, error) {
-	kvs, err := l.kvs()
+	keyValues, err := l.kvs()
 	if err != nil {
 		return store.NilAddress, false, errors.Wrap(err, "while reading key values")
 	}
 
-	idx := sort.Search(len(kvs), func(i int) bool {
-		return bytes.Compare(kvs[i].key, key) >= 0
+	idx := sort.Search(len(keyValues), func(i int) bool {
+		return bytes.Compare(keyValues[i].key, key) >= 0
 	})
 
-	if idx < len(kvs) && bytes.Compare(kvs[idx].key, key) == 0 {
-		kv := kvs[idx]
+	if idx < len(keyValues) && bytes.Compare(keyValues[idx].key, key) == 0 {
+		kv := keyValues[idx]
 		if bytes.Equal(kv.key, key) && kv.value == value {
 			return l.addr, false, nil
 		}
-		kvs[idx].value = value
+		keyValues[idx].value = value
 
-		err = l.storeKVS(kvs)
+		err = l.storeKVS(keyValues)
 		if err != nil {
 			return store.NilAddress, false, errors.Wrap(err, "while storing kvs")
 		}
@@ -62,8 +66,12 @@ func (l leaf) put(key []byte, value store.Address) (store.Address, bool, error) 
 		return l.addr, false, nil
 	}
 
-	kvs = append(kvs[:idx], append([]kv{kv{key: key, value: value}}, kvs[idx:]...)...)
-	err = l.storeKVS(kvs)
+	if l.isFull() {
+		return store.NilAddress, false, errors.New("trying to put into full leaf")
+	}
+
+	keyValues = append(keyValues[:idx], append([]kv{kv{key: key, value: value}}, keyValues[idx:]...)...)
+	err = l.storeKVS(keyValues)
 	if err != nil {
 		return store.NilAddress, false, errors.Wrap(err, "while storing kvs")
 	}
@@ -87,11 +95,6 @@ func (l leaf) get(key []byte) (store.Address, error) {
 	}
 
 	return store.NilAddress, ErrNotFound
-}
-
-type kv struct {
-	key   []byte
-	value store.Address
 }
 
 func (l leaf) keyCount() int {
@@ -130,7 +133,7 @@ func (l leaf) storeKVS(kvs []kv) error {
 
 }
 
-func (l leaf) kvs() ([]kv, error) {
+func (l leaf) kvs() (kvs, error) {
 	cnt := l.keyCount()
 	kvs := make([]kv, cnt)
 	d := l.bl[1:]
@@ -157,4 +160,42 @@ func (l leaf) kvs() ([]kv, error) {
 		d = d[8:]
 	}
 	return kvs, nil
+}
+
+func (l leaf) isFull() bool {
+	return l.keyCount() == 2*int(l.t)-1
+}
+
+func (l leaf) split() (kv, store.Address, store.Address, error) {
+	if !l.isFull() {
+		return kv{}, store.NilAddress, store.NilAddress, errors.New("trying to split not full node")
+	}
+
+	kvs, err := l.kvs()
+
+	if err != nil {
+		return kv{}, store.NilAddress, store.NilAddress, err
+	}
+
+	middle := kvs[l.t-1].copy()
+	left := kvs[:l.t-1].copy()
+	right := kvs[l.t:].copy()
+
+	err = l.storeKVS(left)
+	if err != nil {
+		return kv{}, store.NilAddress, store.NilAddress, errors.Wrap(err, "while storing left part of the split child")
+	}
+
+	_, rl, err := createEmptyLeaf(l.m, l.t, l.keySizeHint)
+	if err != nil {
+		return kv{}, store.NilAddress, store.NilAddress, errors.Wrap(err, "while creating right part of the split child")
+	}
+
+	err = rl.storeKVS(right)
+	if err != nil {
+		return kv{}, store.NilAddress, store.NilAddress, errors.Wrap(err, "while storing right part of the split child")
+	}
+
+	return middle, l.addr, rl.addr, nil
+
 }

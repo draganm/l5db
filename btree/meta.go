@@ -79,6 +79,26 @@ func (m meta) put(key []byte, value store.Address) error {
 		return err
 	}
 
+	if rt.isFull() {
+		kv, left, right, err := rt.split()
+		if err != nil {
+			return errors.Wrap(err, "while splitting root")
+		}
+
+		_, newRoot, err := createEmptyInternalNode(m.m, m.t(), m.keySizeHint())
+		if err != nil {
+			return errors.Wrap(err, "while creating new root")
+		}
+
+		err = newRoot.storeKVSAndChildren(kvs{kv}, []store.Address{left, right})
+		if err != nil {
+			return errors.Wrap(err, "while storing new root kvs")
+		}
+
+		m.setRoot(newRoot.addr)
+		rt = newRoot
+	}
+
 	na, didPut, err := rt.put(key, value)
 	if err != nil {
 		return err
@@ -98,7 +118,7 @@ func (m meta) put(key []byte, value store.Address) error {
 }
 
 func (m meta) getRootNode() (btreeNode, error) {
-	return getNode(m.m, m.root())
+	return getNode(m.m, m.root(), m.t(), m.keySizeHint())
 }
 
 func (m meta) get(key []byte) (store.Address, error) {
@@ -108,4 +128,12 @@ func (m meta) get(key []byte) (store.Address, error) {
 	}
 
 	return rt.get(key)
+}
+
+func (m meta) t() byte {
+	return m.bl[18]
+}
+
+func (m meta) keySizeHint() uint16 {
+	return binary.BigEndian.Uint16(m.bl[16:])
 }
