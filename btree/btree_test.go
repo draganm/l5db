@@ -20,7 +20,7 @@ func tempDir(t *testing.T) (string, func()) {
 
 func createTestStore(t *testing.T) (*store.Store, func()) {
 	td, cleanup := tempDir(t)
-	// defer cleanup()
+	defer cleanup()
 
 	st, err := store.Open(td, 1024*1024*1024)
 	require.NoError(t, err)
