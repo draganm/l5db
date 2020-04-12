@@ -67,17 +67,27 @@ func (i internalNode) put(key []byte, value store.Address) (store.Address, bool,
 		return i.addr, false, nil
 	}
 
-	if i.isFull() {
-		return store.NilAddress, false, errors.New("trying to put into full internalNode")
-	}
-
 	childAddress := children[idx]
 
 	child, err := getNode(i.m, childAddress, i.t, i.keySizeHint)
 
 	if child.isFull() {
 		// split the child, re-try the put
-		return store.NilAddress, false, errors.Wrap(err, "TODO: implement splitting the child")
+		middle, left, right, err := child.split()
+		if err != nil {
+			return store.NilAddress, false, errors.Wrap(err, "while splitting the child")
+		}
+
+		kvs = append(kvs[:idx], append([]kv{middle}, kvs[idx:]...)...)
+		children[idx] = left
+		children = append(children[:idx], append([]store.Address{left, right}, children[idx:]...)...)
+
+		err = i.storeKVSAndChildren(kvs, children)
+		if err != nil {
+			return store.NilAddress, false, errors.Wrap(err, "storring split children references")
+		}
+
+		return i.put(key, value)
 	}
 
 	nca, inserted, err := child.put(key, value)
@@ -202,7 +212,7 @@ func (i internalNode) kvsAndChildren() (kvs, []store.Address, error) {
 }
 
 func (i internalNode) isFull() bool {
-	return i.keyCount() == 2*int(i.t)-1
+	return i.keyCount() == 2*int(i.t)-2
 }
 
 func (i internalNode) split() (kv, store.Address, store.Address, error) {
@@ -239,4 +249,27 @@ func (i internalNode) split() (kv, store.Address, store.Address, error) {
 
 	return middle, i.addr, ri.addr, nil
 
+}
+
+func (i internalNode) structure() structure {
+	kvs, children, err := i.kvsAndChildren()
+	if err != nil {
+		panic(err)
+	}
+
+	ch := []structure{}
+
+	for _, c := range children {
+		cn, err := getNode(i.m, c, i.t, i.keySizeHint)
+		if err != nil {
+			panic(err)
+		}
+		ch = append(ch, cn.structure())
+	}
+
+	return structure{
+		Type:     "internal",
+		KVS:      kvs,
+		Children: ch,
+	}
 }

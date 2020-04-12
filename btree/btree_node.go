@@ -1,20 +1,44 @@
 package btree
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/draganm/l5db/store"
 	"github.com/pkg/errors"
 )
+
+type structure struct {
+	Type     string      `json:"type"`
+	KVS      kvs         `json:"kvs,omitempty"`
+	Children []structure `json:"ch,omitempty"`
+}
 
 type btreeNode interface {
 	put(key []byte, value store.Address) (store.Address, bool, error)
 	get(key []byte) (store.Address, error)
 	isFull() bool
 	split() (kv, store.Address, store.Address, error)
+	structure() structure
 }
 
 type kv struct {
 	key   []byte
 	value store.Address
+}
+
+func (k kv) MarshalJSON() ([]byte, error) {
+	j, err := json.Marshal(struct {
+		Key   string `json:"key"`
+		Value uint64 `json:"value"`
+	}{
+		Key:   fmt.Sprintf("%v", k.key),
+		Value: k.value.UInt64(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return j, nil
 }
 
 func (k kv) copy() kv {

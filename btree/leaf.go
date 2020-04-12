@@ -199,3 +199,14 @@ func (l leaf) split() (kv, store.Address, store.Address, error) {
 	return middle, l.addr, rl.addr, nil
 
 }
+
+func (l leaf) structure() structure {
+	kvs, err := l.kvs()
+	if err != nil {
+		panic(err)
+	}
+	return structure{
+		Type: "leaf",
+		KVS:  kvs,
+	}
+}

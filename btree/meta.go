@@ -137,3 +137,14 @@ func (m meta) t() byte {
 func (m meta) keySizeHint() uint16 {
 	return binary.BigEndian.Uint16(m.bl[16:])
 }
+
+func (m meta) structure() structure {
+	rn, err := m.getRootNode()
+	if err != nil {
+		panic(err)
+	}
+	return structure{
+		Type:     "meta",
+		Children: []structure{rn.structure()},
+	}
+}
