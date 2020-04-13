@@ -58,3 +58,59 @@ func TestAppendToEmpty(t *testing.T) {
 	require.Equal(t, []byte{1, 2, 3}, d)
 
 }
+
+func TestAppendToFullBlock(t *testing.T) {
+
+	ts, cleanup := createTestStore(t)
+	defer cleanup()
+
+	a, err := sequential.CreateEmpty(ts, 3)
+	require.NoError(t, err)
+
+	err = sequential.Append(ts, a, []byte{1, 2, 3})
+	require.NoError(t, err)
+
+	s, err := sequential.Size(ts, a)
+	require.NoError(t, err)
+
+	require.Equal(t, uint64(3), s)
+
+	r, err := sequential.Reader(ts, a)
+	require.NoError(t, err)
+
+	d, err := ioutil.ReadAll(r)
+	require.NoError(t, err)
+
+	require.Equal(t, []byte{1, 2, 3}, d)
+
+}
+
+func TestAppendTreeBlocks(t *testing.T) {
+
+	ts, cleanup := createTestStore(t)
+	defer cleanup()
+
+	a, err := sequential.CreateEmpty(ts, 1)
+	require.NoError(t, err)
+
+	err = sequential.Append(ts, a, []byte{1, 2, 3})
+	require.NoError(t, err)
+
+	s, err := sequential.Size(ts, a)
+	require.NoError(t, err)
+
+	require.Equal(t, uint64(3), s)
+
+	r, err := sequential.Reader(ts, a)
+	require.NoError(t, err)
+
+	d, err := ioutil.ReadAll(r)
+	require.NoError(t, err)
+
+	require.Equal(t, []byte{1, 2, 3}, d)
+
+	sz, err := sequential.Size(ts, a)
+	require.NoError(t, err)
+	require.Equal(t, uint64(3), sz)
+
+}

@@ -98,6 +98,11 @@ func (d data) nextBlockAddress() store.Address {
 	return store.Address(binary.BigEndian.Uint64(d.bl))
 }
 
+func (d data) setNextBlockAddress(a store.Address) error {
+	binary.BigEndian.PutUint64(d.bl, a.UInt64())
+	return d.m.Touch(d.addr)
+}
+
 func (d data) hasNextBlock() bool {
 	return d.nextBlockAddress() != store.NilAddress
 }

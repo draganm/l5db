@@ -85,12 +85,36 @@ func (m meta) append(data []byte) error {
 		}
 
 		data = data[cnt:]
+		if len(data) > 0 {
+			err = m.appendEmptyBlock()
+			if err != nil {
+				return err
+			}
+		}
 
 	}
 
 	return m.addDataSize(uint64(totalSize))
 
-	return nil
+}
+
+func (m meta) appendEmptyBlock() error {
+	ldb, err := getData(m.m, m.lastDataBlockAddress())
+	if err != nil {
+		return err
+	}
+
+	ndba, _, err := createEmptyData(m.m, m.blockSize())
+	if err != nil {
+		return err
+	}
+
+	err = ldb.setNextBlockAddress(ndba)
+	if err != nil {
+		return errors.Wrap(err, "while setting the next block address")
+	}
+
+	return m.setLastDataBlock(ndba)
 }
 
 func (m meta) isEmpty() bool {
