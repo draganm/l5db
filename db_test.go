@@ -48,4 +48,13 @@ func TestCreateEmptyMap(t *testing.T) {
 
 	err := db.CreateMap("abc")
 	require.NoError(t, err)
+
+	rootSize, err := db.Size("")
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), rootSize)
+
+	abcSize, err := db.Size("abc")
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), abcSize)
+
 }
