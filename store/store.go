@@ -151,3 +151,12 @@ type Memory interface {
 	GetBlock(addr Address) ([]byte, BlockType, error)
 	Touch(Address) error
 }
+
+func (s *Store) GetRootAddress() Address {
+	return Address(binary.BigEndian.Uint64(s.mm[8:]))
+}
+
+func (s *Store) SetRootAddress(a Address) error {
+	binary.BigEndian.PutUint64(s.mm[8:], a.UInt64())
+	return nil
+}
