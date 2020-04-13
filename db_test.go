@@ -57,4 +57,12 @@ func TestCreateEmptyMap(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), abcSize)
 
+	abcExists, err := db.Exists("abc")
+	require.NoError(t, err)
+	require.True(t, abcExists)
+
+	defExists, err := db.Exists("def")
+	require.NoError(t, err)
+	require.False(t, defExists)
+
 }

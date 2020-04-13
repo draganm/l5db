@@ -65,7 +65,7 @@ func (d *DB) getAddressOf(pth string) (store.Address, error) {
 		var err error
 		ma, err = btree.Get(d.st, ma, []byte(pe))
 		if err != nil {
-			return store.NilAddress, errors.Wrap(err, "while creating map")
+			return store.NilAddress, errors.Wrap(err, "while getting element")
 		}
 	}
 
@@ -80,4 +80,20 @@ func (d *DB) Size(path string) (uint64, error) {
 	}
 
 	return btree.Count(d.st, ta)
+}
+
+func (d *DB) Exists(path string) (bool, error) {
+	a, err := d.getAddressOf(path)
+
+	cause := errors.Cause(err)
+
+	if cause == btree.ErrNotFound {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return a != store.NilAddress, nil
 }
