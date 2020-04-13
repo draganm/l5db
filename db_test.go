@@ -66,3 +66,20 @@ func TestCreateEmptyMap(t *testing.T) {
 	require.False(t, defExists)
 
 }
+
+func TestPutData(t *testing.T) {
+	db, cleanup := createEmptyDB(t)
+
+	defer cleanup()
+
+	err := db.CreateMap("abc")
+	require.NoError(t, err)
+
+	err = db.Put("abc/def", []byte{1, 2, 3})
+	require.NoError(t, err)
+
+	d, err := db.Get("abc/def")
+	require.NoError(t, err)
+	require.Equal(t, []byte{1, 2, 3}, d)
+
+}

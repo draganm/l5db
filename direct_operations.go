@@ -2,9 +2,11 @@ package l5db
 
 import (
 	serrors "errors"
+	"io/ioutil"
 
 	"github.com/draganm/l5db/btree"
 	"github.com/draganm/l5db/dbpath"
+	"github.com/draganm/l5db/sequential"
 	"github.com/draganm/l5db/store"
 	"github.com/pkg/errors"
 )
@@ -96,4 +98,56 @@ func (d *DB) Exists(path string) (bool, error) {
 	}
 
 	return a != store.NilAddress, nil
+}
+
+func (d *DB) Put(pth string, data []byte) error {
+	parsedPath, err := dbpath.Split(pth)
+	if err != nil {
+		return errors.Wrapf(err, "while parsing dbpath %q", pth)
+	}
+
+	if len(pth) == 0 {
+		return errors.New("trying to put data into root")
+	}
+
+	ma, err := d.getAddressOfParent(parsedPath)
+	if err != nil {
+		return err
+	}
+
+	blockSize := 16 * 1024
+
+	if len(data) < blockSize {
+		blockSize = len(data)
+	}
+
+	empty, err := sequential.CreateEmpty(d.st, uint16(blockSize))
+	if err != nil {
+		return errors.Wrap(err, "while creating empty sequential data")
+	}
+
+	lastKey := parsedPath[len(parsedPath)-1]
+
+	err = sequential.Append(d.st, empty, data)
+	if err != nil {
+		return errors.Wrap(err, "while appending sequential data")
+	}
+
+	return btree.Put(d.st, ma, []byte(lastKey), empty)
+}
+
+func (d *DB) Get(path string) ([]byte, error) {
+	a, err := d.getAddressOf(path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	r, err := sequential.Reader(d.st, a)
+	if err != nil {
+		return nil, err
+	}
+
+	return ioutil.ReadAll(r)
+
 }
