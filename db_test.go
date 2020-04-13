@@ -28,3 +28,24 @@ func TestOpenAndClose(t *testing.T) {
 	require.NoError(t, err)
 
 }
+
+func createEmptyDB(t *testing.T) (*l5db.DB, func()) {
+	td, cleanup := createTempDir(t)
+	db, err := l5db.Open(td)
+	require.NoError(t, err)
+
+	return db, func() {
+		err = db.Close()
+		require.NoError(t, err)
+		cleanup()
+	}
+}
+
+func TestCreateEmptyMap(t *testing.T) {
+	db, cleanup := createEmptyDB(t)
+
+	defer cleanup()
+
+	err := db.CreateMap("abc")
+	require.NoError(t, err)
+}
