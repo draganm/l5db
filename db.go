@@ -1,6 +1,8 @@
 package l5db
 
 import (
+	"sync"
+
 	"github.com/draganm/l5db/btree"
 	"github.com/draganm/l5db/store"
 	"github.com/pkg/errors"
@@ -8,11 +10,12 @@ import (
 
 type DB struct {
 	st *store.Store
+	mu sync.Mutex
 }
 
 func Open(dir string) (*DB, error) {
 
-	st, err := store.Open(dir, 2*1024*1024*1024*1024)
+	st, err := store.Open(dir, 1*1024*1024*1024*1024)
 	if err != nil {
 		return nil, err
 	}

@@ -60,29 +60,25 @@ func (k kvs) copy() kvs {
 	return c
 }
 
+// func (k kvs) insertAt(idx int, kv kv) kvs {
+// 	res := make(kvs, len(k)+1)
+// 	copy(res, k[:idx])
+// 	res[idx] = kv
+// 	copy(res[idx+1:], k[idx:])
+// 	return res
+// }
+
 func getNode(m store.Memory, a store.Address, t byte, keySizeHint uint16) (btreeNode, error) {
-	bl, tp, err := m.GetBlock(a)
+	_, tp, err := m.GetBlock(a)
 	if err != nil {
 		return nil, err
 	}
 
 	switch tp {
 	case store.BTreeLeafBlockType:
-		return leaf{
-			m:           m,
-			addr:        a,
-			bl:          bl,
-			t:           t,
-			keySizeHint: keySizeHint,
-		}, nil
+		return loadLeaf(m, a, t, keySizeHint)
 	case store.BTreeInternalNodeBlockType:
-		return internalNode{
-			m:           m,
-			addr:        a,
-			bl:          bl,
-			t:           t,
-			keySizeHint: keySizeHint,
-		}, nil
+		return loadInternalNode(m, a, t, keySizeHint)
 	default:
 		return nil, errors.Errorf("unsupported node type %d", tp)
 

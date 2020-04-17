@@ -13,7 +13,7 @@ func CreateEmptyBTree(a store.Memory, t byte, keySizeHint uint16) (store.Address
 		return store.NilAddress, err
 	}
 
-	la, _, err := createEmptyLeaf(a, t, keySizeHint)
+	la, _, err := createLeaf(a, t, keySizeHint, nil)
 	if err != nil {
 		return store.NilAddress, err
 	}

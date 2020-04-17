@@ -95,6 +95,11 @@ func (s *Store) Allocate(size int, t BlockType) (Address, []byte, error) {
 			return 0, nil, errors.Wrapf(err, "while increasing store by %d bytes", toAppend)
 		}
 
+		err = s.f.Sync()
+		if err != nil {
+			return NilAddress, nil, err
+		}
+
 		s.currentSize += toAppend
 	}
 

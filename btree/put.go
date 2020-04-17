@@ -10,5 +10,8 @@ func Put(m store.Memory, a store.Address, key []byte, value store.Address) error
 		return err
 	}
 
-	return met.put(key, value)
+	kc := make([]byte, len(key))
+	copy(kc, key)
+
+	return met.put(kc, value)
 }

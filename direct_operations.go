@@ -14,6 +14,7 @@ import (
 var ErrNotFound = serrors.New("not found")
 
 func (d *DB) getAddressOfParent(parsedPath []string) (store.Address, error) {
+
 	ma := d.st.GetRootAddress()
 
 	for _, pe := range parsedPath[:len(parsedPath)-1] {
@@ -29,6 +30,8 @@ func (d *DB) getAddressOfParent(parsedPath []string) (store.Address, error) {
 }
 
 func (d *DB) CreateMap(pth string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
 	parsedPath, err := dbpath.Split(pth)
 	if err != nil {
@@ -39,6 +42,8 @@ func (d *DB) CreateMap(pth string) error {
 		return errors.New("trying to create root")
 	}
 
+	lastKey := parsedPath[len(parsedPath)-1]
+
 	ma, err := d.getAddressOfParent(parsedPath)
 	if err != nil {
 		return err
@@ -48,8 +53,6 @@ func (d *DB) CreateMap(pth string) error {
 	if err != nil {
 		return errors.Wrap(err, "while creating empty btree")
 	}
-
-	lastKey := parsedPath[len(parsedPath)-1]
 
 	return btree.Put(d.st, ma, []byte(lastKey), empty)
 
@@ -76,6 +79,9 @@ func (d *DB) getAddressOf(pth string) (store.Address, error) {
 }
 
 func (d *DB) Size(path string) (uint64, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	ta, err := d.getAddressOf(path)
 	if err != nil {
 		return 0, err
@@ -85,6 +91,9 @@ func (d *DB) Size(path string) (uint64, error) {
 }
 
 func (d *DB) Exists(path string) (bool, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	a, err := d.getAddressOf(path)
 
 	cause := errors.Cause(err)
@@ -101,6 +110,9 @@ func (d *DB) Exists(path string) (bool, error) {
 }
 
 func (d *DB) Put(pth string, data []byte) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	parsedPath, err := dbpath.Split(pth)
 	if err != nil {
 		return errors.Wrapf(err, "while parsing dbpath %q", pth)
@@ -109,6 +121,8 @@ func (d *DB) Put(pth string, data []byte) error {
 	if len(pth) == 0 {
 		return errors.New("trying to put data into root")
 	}
+
+	lastKey := parsedPath[len(parsedPath)-1]
 
 	ma, err := d.getAddressOfParent(parsedPath)
 	if err != nil {
@@ -126,8 +140,6 @@ func (d *DB) Put(pth string, data []byte) error {
 		return errors.Wrap(err, "while creating empty sequential data")
 	}
 
-	lastKey := parsedPath[len(parsedPath)-1]
-
 	err = sequential.Append(d.st, empty, data)
 	if err != nil {
 		return errors.Wrap(err, "while appending sequential data")
@@ -137,6 +149,9 @@ func (d *DB) Put(pth string, data []byte) error {
 }
 
 func (d *DB) Get(path string) ([]byte, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	a, err := d.getAddressOf(path)
 
 	if err != nil {

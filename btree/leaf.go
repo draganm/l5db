@@ -15,6 +15,7 @@ type leaf struct {
 	bl          []byte
 	t           byte
 	keySizeHint uint16
+	kvs         kvs
 }
 
 // leaf layout:
@@ -23,42 +24,91 @@ type leaf struct {
 //  key bytes
 //  8 bytes child address
 
-func createEmptyLeaf(m store.Memory, t byte, keySizeHint uint16) (store.Address, leaf, error) {
-	expectedSize := 1 + (2+int(keySizeHint)+8)*(2*int(t)-1)
+func createLeaf(m store.Memory, t byte, keySizeHint uint16, kvs kvs) (store.Address, leaf, error) {
+	expectedSize := 1 + (2+int(keySizeHint)+8)*(2*int(t))
 	ad, bl, err := m.Allocate(expectedSize, store.BTreeLeafBlockType)
 	if err != nil {
 		return store.NilAddress, leaf{}, errors.Wrap(err, "while allocationg empty btree leaf")
 	}
 
-	m.Touch(ad)
-
-	return ad, leaf{
+	l := leaf{
 		m:           m,
 		addr:        ad,
 		bl:          bl,
 		t:           t,
 		keySizeHint: keySizeHint,
+		kvs:         kvs,
+	}
+
+	err = l.store()
+	if err != nil {
+		return store.NilAddress, leaf{}, err
+	}
+
+	return ad, l, nil
+}
+
+func loadLeaf(m store.Memory, a store.Address, t byte, keySizeHint uint16) (leaf, error) {
+	bl, tp, err := m.GetBlock(a)
+	if err != nil {
+		return leaf{}, errors.Wrap(err, "while getting block")
+	}
+
+	if tp != store.BTreeLeafBlockType {
+		return leaf{}, errors.New("not a btree leaf block")
+	}
+
+	cnt := int(bl[0])
+	kvs := make(kvs, cnt)
+	d := bl[1:]
+	for i := 0; i < cnt; i++ {
+		if len(d) < 2 {
+			return leaf{}, errors.New("btree leaf malformated: not enough bytes for key length")
+		}
+		l := int(binary.BigEndian.Uint16(d))
+		d = d[2:]
+
+		if len(d) < l {
+			return leaf{}, errors.New("btree leaf malformated: not enough bytes for bytes")
+		}
+
+		k := d[:l]
+		d = d[l:]
+
+		if len(d) < 8 {
+			return leaf{}, errors.New("btree leaf malformated: not enough bytes for value address")
+		}
+
+		kvs[i].key = copyByteSlice(k)
+		kvs[i].value = store.Address(binary.BigEndian.Uint64(d))
+		d = d[8:]
+	}
+
+	return leaf{
+		m:           m,
+		t:           t,
+		keySizeHint: keySizeHint,
+		addr:        a,
+		bl:          bl,
+		kvs:         kvs.copy(),
 	}, nil
+
 }
 
 func (l leaf) put(key []byte, value store.Address) (store.Address, bool, error) {
-	keyValues, err := l.kvs()
-	if err != nil {
-		return store.NilAddress, false, errors.Wrap(err, "while reading key values")
-	}
 
-	idx := sort.Search(len(keyValues), func(i int) bool {
-		return bytes.Compare(keyValues[i].key, key) >= 0
+	idx := sort.Search(len(l.kvs), func(i int) bool {
+		return bytes.Compare(l.kvs[i].key, key) >= 0
 	})
 
-	if idx < len(keyValues) && bytes.Compare(keyValues[idx].key, key) == 0 {
-		kv := keyValues[idx]
+	if idx < len(l.kvs) && bytes.Compare(l.kvs[idx].key, key) == 0 {
+		kv := l.kvs[idx]
 		if bytes.Equal(kv.key, key) && kv.value == value {
 			return l.addr, false, nil
 		}
-		keyValues[idx].value = value
+		l.kvs[idx].value = value
 
-		err = l.storeKVS(keyValues)
+		err := l.store()
 		if err != nil {
 			return store.NilAddress, false, errors.Wrap(err, "while storing kvs")
 		}
@@ -70,8 +120,8 @@ func (l leaf) put(key []byte, value store.Address) (store.Address, bool, error) 
 		return store.NilAddress, false, errors.New("trying to put into full leaf")
 	}
 
-	keyValues = append(keyValues[:idx], append([]kv{kv{key: key, value: value}}, keyValues[idx:]...)...)
-	err = l.storeKVS(keyValues)
+	l.kvs = append(l.kvs[:idx], append([]kv{kv{key: key, value: value}}, l.kvs[idx:]...)...)
+	err := l.store()
 	if err != nil {
 		return store.NilAddress, false, errors.Wrap(err, "while storing kvs")
 	}
@@ -81,30 +131,41 @@ func (l leaf) put(key []byte, value store.Address) (store.Address, bool, error) 
 }
 
 func (l leaf) get(key []byte) (store.Address, error) {
-	kvs, err := l.kvs()
-	if err != nil {
-		return store.NilAddress, err
-	}
 
-	idx := sort.Search(len(kvs), func(i int) bool {
-		return bytes.Compare(kvs[i].key, key) >= 0
+	idx := sort.Search(len(l.kvs), func(i int) bool {
+		return bytes.Compare(l.kvs[i].key, key) >= 0
 	})
 
-	if idx < len(kvs) && bytes.Compare(kvs[idx].key, key) == 0 {
-		return kvs[idx].value, nil
+	if idx < len(l.kvs) && bytes.Compare(l.kvs[idx].key, key) == 0 {
+		return l.kvs[idx].value, nil
 	}
 
 	return store.NilAddress, ErrNotFound
 }
 
 func (l leaf) keyCount() int {
-	return int(l.bl[0])
+	return len(l.kvs)
 }
 
-func (l leaf) storeKVS(kvs []kv) error {
+func (l leaf) store() error {
+
+	isSorted := sort.SliceIsSorted(l.kvs, func(j, k int) bool {
+		return bytes.Compare(l.kvs[j].key, l.kvs[k].key) < 0
+	})
+
+	if !isSorted {
+		return errors.New("leaf kvs are not sorted")
+	}
+
+	for j := 0; j < len(l.kvs)-1; j++ {
+		if bytes.Equal(l.kvs[j].key, l.kvs[j+1].key) {
+			return errors.New("leaf kvs has duplicate values")
+		}
+	}
+
 	totalSize := 1
 
-	for _, kv := range kvs {
+	for _, kv := range l.kvs {
 		totalSize += 2 + len(kv.key) + 8
 	}
 
@@ -114,11 +175,11 @@ func (l leaf) storeKVS(kvs []kv) error {
 
 	d := l.bl
 
-	d[0] = byte(len(kvs))
+	d[0] = byte(len(l.kvs))
 
 	d = d[1:]
 
-	for _, kv := range kvs {
+	for _, kv := range l.kvs {
 		binary.BigEndian.PutUint16(d, uint16(len(kv.key)))
 		d = d[2:]
 		copy(d, kv.key)
@@ -133,35 +194,6 @@ func (l leaf) storeKVS(kvs []kv) error {
 
 }
 
-func (l leaf) kvs() (kvs, error) {
-	cnt := l.keyCount()
-	kvs := make([]kv, cnt)
-	d := l.bl[1:]
-	for i := 0; i < cnt; i++ {
-		if len(d) < 2 {
-			return nil, errors.New("btree leaf malformated: not enough bytes for key length")
-		}
-		l := int(binary.BigEndian.Uint16(d))
-		d = d[2:]
-
-		if len(d) < l {
-			return nil, errors.New("btree leaf malformated: not enough bytes for bytes")
-		}
-
-		k := d[:l]
-		d = d[l:]
-
-		if len(d) < 8 {
-			return nil, errors.New("btree leaf malformated: not enough bytes for value address")
-		}
-
-		kvs[i].key = k
-		kvs[i].value = store.Address(binary.BigEndian.Uint64(d))
-		d = d[8:]
-	}
-	return kvs, nil
-}
-
 func (l leaf) isFull() bool {
 	return l.keyCount() == 2*int(l.t)-1
 }
@@ -171,42 +203,30 @@ func (l leaf) split() (kv, store.Address, store.Address, error) {
 		return kv{}, store.NilAddress, store.NilAddress, errors.New("trying to split not full node")
 	}
 
-	kvs, err := l.kvs()
+	middle := l.kvs[l.t-1].copy()
+	left := l.kvs[:l.t-1].copy()
+	right := l.kvs[l.t:].copy()
 
-	if err != nil {
-		return kv{}, store.NilAddress, store.NilAddress, err
-	}
-
-	middle := kvs[l.t-1].copy()
-	left := kvs[:l.t-1].copy()
-	right := kvs[l.t:].copy()
-
-	err = l.storeKVS(left)
+	l.kvs = left.copy()
+	err := l.store()
 	if err != nil {
 		return kv{}, store.NilAddress, store.NilAddress, errors.Wrap(err, "while storing left part of the split child")
 	}
 
-	_, rl, err := createEmptyLeaf(l.m, l.t, l.keySizeHint)
+	ra, _, err := createLeaf(l.m, l.t, l.keySizeHint, right)
 	if err != nil {
 		return kv{}, store.NilAddress, store.NilAddress, errors.Wrap(err, "while creating right part of the split child")
 	}
 
-	err = rl.storeKVS(right)
-	if err != nil {
-		return kv{}, store.NilAddress, store.NilAddress, errors.Wrap(err, "while storing right part of the split child")
-	}
+	// fmt.Println("leaf left", l.addr, left, "leaf right", ra, right)
 
-	return middle, l.addr, rl.addr, nil
+	return middle, l.addr, ra, nil
 
 }
 
 func (l leaf) structure() structure {
-	kvs, err := l.kvs()
-	if err != nil {
-		panic(err)
-	}
 	return structure{
 		Type: "leaf",
-		KVS:  kvs,
+		KVS:  l.kvs.copy(),
 	}
 }

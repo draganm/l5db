@@ -85,17 +85,12 @@ func (m meta) put(key []byte, value store.Address) error {
 			return errors.Wrap(err, "while splitting root")
 		}
 
-		_, newRoot, err := createEmptyInternalNode(m.m, m.t(), m.keySizeHint())
+		addr, newRoot, err := createInternalNode(m.m, m.t(), m.keySizeHint(), kvs{kv}, children{left, right})
 		if err != nil {
 			return errors.Wrap(err, "while creating new root")
 		}
 
-		err = newRoot.storeKVSAndChildren(kvs{kv}, []store.Address{left, right})
-		if err != nil {
-			return errors.Wrap(err, "while storing new root kvs")
-		}
-
-		m.setRoot(newRoot.addr)
+		m.setRoot(addr)
 		rt = newRoot
 	}
 
