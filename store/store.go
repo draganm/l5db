@@ -78,7 +78,7 @@ func (s *Store) Close() error {
 const sizeIncrease = 16 * 1024 * 1024
 
 func bitsForSize(size int) int {
-	var bits = 4
+	var bits = 3
 
 	for ; size>>bits > 0; bits++ {
 	}
