@@ -77,9 +77,23 @@ func (s *Store) Close() error {
 
 const sizeIncrease = 16 * 1024 * 1024
 
+func bitsForSize(size int) int {
+	var bits = 4
+
+	for ; size>>bits > 0; bits++ {
+	}
+
+	return bits
+
+}
+
 func (s *Store) Allocate(size int, t BlockType) (Address, []byte, error) {
+
+	bits := bitsForSize(size + 2)
+	bitsSize := 1 << bits
+
 	nfa := s.nextFreeAddress().UInt64()
-	end := nfa + uint64(size+3)
+	end := nfa + uint64(bitsSize)
 	if end > s.currentSize {
 		missing := end - s.currentSize
 		toAppend := missing / sizeIncrease
@@ -106,11 +120,10 @@ func (s *Store) Allocate(size int, t BlockType) (Address, []byte, error) {
 	// DON'T REMOVE: write new NFA
 	binary.BigEndian.PutUint64(s.mm[:8], end)
 
-	binary.BigEndian.PutUint16(s.mm[nfa:nfa+2], uint16(size+3))
+	s.mm[nfa] = byte(bits)
+	s.mm[nfa+1] = byte(t)
 
-	s.mm[nfa+2] = byte(t)
-
-	return Address(nfa + 3), s.mm[nfa+3 : nfa+3+uint64(size)], nil
+	return Address(nfa + 2), s.mm[nfa+2 : nfa+2+uint64(size)], nil
 
 }
 
@@ -129,17 +142,18 @@ func (s *Store) GetBlock(addr Address) ([]byte, BlockType, error) {
 		return nil, 0, errors.New("block is past the highest address")
 	}
 
-	bld := s.mm[addr-3:]
+	bld := s.mm[addr-2:]
+	bits := bld[0]
 
-	l := binary.BigEndian.Uint16(bld)
+	l := 1 << int(bits)
 
 	bld = bld[:l]
-	if len(bld) < 3 {
+	if len(bld) < 2 {
 		return nil, 0, errors.New("block is too short")
 	}
-	t := BlockType(bld[2])
+	t := BlockType(bld[1])
 
-	return bld[3:], t, nil
+	return bld[2:], t, nil
 }
 
 func (s *Store) Free(Address) error {
