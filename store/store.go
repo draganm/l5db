@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/edsrzf/mmap-go"
+	"github.com/draganm/mmap-go"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
@@ -15,6 +15,7 @@ type Store struct {
 	f           *os.File
 	mm          mmap.MMap
 	currentSize uint64
+	maxSize     int
 }
 
 func Open(dir string, maxSize int) (*Store, error) {
@@ -41,7 +42,9 @@ func Open(dir string, maxSize int) (*Store, error) {
 		currentSize = 16
 	}
 
-	mm, err := mmap.MapRegion(f, maxSize, mmap.RDWR, 0, 0)
+	mmFlags := mmap.RDWR
+
+	mm, err := mmap.MapRegion(f, maxSize, mmFlags, 0, 0)
 
 	if err != nil {
 		return nil, errors.Wrapf(err, "while memory mapping file %s", storeFileName)
@@ -57,6 +60,7 @@ func Open(dir string, maxSize int) (*Store, error) {
 		f:           f,
 		mm:          mm,
 		currentSize: currentSize,
+		maxSize:     maxSize,
 	}, nil
 
 }

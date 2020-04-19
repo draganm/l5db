@@ -41,3 +41,15 @@ func Open(dir string) (*DB, error) {
 func (d *DB) Close() error {
 	return d.st.Close()
 }
+
+func (d *DB) NewWriteTransaction() (*WriteTransaction, error) {
+	// TODO locking, context, one write tx at a time
+	st, err := d.st.PrivateMMap()
+	if err != nil {
+		return nil, errors.Wrap(err, "while creating private MMAP for read tx")
+	}
+
+	return &WriteTransaction{
+		s: st,
+	}, nil
+}
