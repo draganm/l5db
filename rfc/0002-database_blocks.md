@@ -16,9 +16,21 @@ This is a description of how single memory mapped file is split into smaller uni
 # Motivation
 [motivation]: #motivation
 
-Just having one big piece of memory is not very useful, unless there is a methodology to organize the available memory into smaller pieces that can be used by the database.
+Plan for building the structure of l5db (spoiler alert!) is to use nested B-Trees with data at the lowest level leaves.
+Hence we are introducing notion of blocks as an atomic piece of information in l5db.
 
-This RFC describes how l5db organizes the memory-mapped file into fix sized blocks.
+Blocks solve following requirements.
+
+# Manageable chunks of data
+
+Just having one big piece of memory is not very useful for storing a B-Tree, since B-Tree operates on small chunks of memory for nodes, also data should be split into chunks with an upper bound in size, which will enable us to have streaming-like interface for processing large amounts of data (e.g. 100mb data as a leaf).
+
+# Memory management
+
+Memory mapped file enables us keep more data in our database than can be fitted into available RAM.
+Still, the available space will be exhausted really quickly if we don't have a strategy for allocating and re-using de-allocated parts of the file
+At the same time we should avoiding as much as possible memory fragmentation.
+Introducing blocks help with with task by fitting nicely into a buddy memory allocator method [1], that is also used by the Linux kernel.
 
 # Design
 [design]: #design
@@ -83,3 +95,8 @@ Also implementing an allocator almost always implies having a similar header bef
 Most of databases have fixed sized data blocks. 
 Usually size of 4kb is chosen for a block, since that coincides with the memory page size.
 In our case we will be needing smaller blocks, so that we can support storing very small chunks of data (e.g. 32 bytes ethereum transaction hash).
+
+
+# References
+
+[1] Kenneth C. Knowlton. A fast storage allocator. Communications of the ACM, 8(10):623–624, 1965.
