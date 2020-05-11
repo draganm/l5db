@@ -25,7 +25,7 @@ func createMeta(m store.Memory, t byte, keySizeHint uint16) (store.Address, meta
 		return store.NilAddress, meta{}, errors.Wrap(err, "while allocating btree meta data")
 	}
 
-	binary.BigEndian.PutUint16(d[16:], uint16(keySizeHint))
+	binary.LittleEndian.PutUint16(d[16:], uint16(keySizeHint))
 	d[18] = byte(t)
 
 	m.Touch(a)
@@ -55,20 +55,20 @@ func getMetaNode(m store.Memory, a store.Address) (meta, error) {
 }
 
 func (m meta) count() uint64 {
-	return binary.BigEndian.Uint64(m.bl)
+	return binary.LittleEndian.Uint64(m.bl)
 }
 
 func (m meta) incrementCount() {
-	binary.BigEndian.PutUint64(m.bl, m.count()+1)
+	binary.LittleEndian.PutUint64(m.bl, m.count()+1)
 	m.m.Touch(m.addr)
 }
 
 func (m meta) root() store.Address {
-	return store.Address(binary.BigEndian.Uint64(m.bl[8:]))
+	return store.Address(binary.LittleEndian.Uint64(m.bl[8:]))
 }
 
 func (m meta) setRoot(r store.Address) {
-	binary.BigEndian.PutUint64(m.bl[8:], r.UInt64())
+	binary.LittleEndian.PutUint64(m.bl[8:], r.UInt64())
 	m.m.Touch(m.addr)
 }
 
@@ -130,7 +130,7 @@ func (m meta) t() byte {
 }
 
 func (m meta) keySizeHint() uint16 {
-	return binary.BigEndian.Uint16(m.bl[16:])
+	return binary.LittleEndian.Uint16(m.bl[16:])
 }
 
 func (m meta) structure() structure {

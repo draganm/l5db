@@ -27,7 +27,7 @@ func createMeta(m store.Memory, blockSize uint16) (store.Address, meta, error) {
 		return store.NilAddress, meta{}, errors.Wrap(err, "while allocating sequential meta data")
 	}
 
-	binary.BigEndian.PutUint16(d[24:], uint16(blockSize))
+	binary.LittleEndian.PutUint16(d[24:], uint16(blockSize))
 
 	m.Touch(a)
 
@@ -60,7 +60,7 @@ func getMeta(m store.Memory, a store.Address) (meta, error) {
 }
 
 func (m meta) dataSize() uint64 {
-	return binary.BigEndian.Uint64(m.bl[16:])
+	return binary.LittleEndian.Uint64(m.bl[16:])
 }
 
 func (m meta) append(data []byte) error {
@@ -122,16 +122,16 @@ func (m meta) isEmpty() bool {
 }
 
 func (m meta) addDataSize(n uint64) error {
-	binary.BigEndian.PutUint64(m.bl[16:], m.dataSize()+n)
+	binary.LittleEndian.PutUint64(m.bl[16:], m.dataSize()+n)
 	return m.m.Touch(m.addr)
 }
 
 func (m meta) firstDataBlockAddress() store.Address {
-	return store.Address(binary.BigEndian.Uint64(m.bl))
+	return store.Address(binary.LittleEndian.Uint64(m.bl))
 }
 
 func (m meta) lastDataBlockAddress() store.Address {
-	return store.Address(binary.BigEndian.Uint64(m.bl[8:]))
+	return store.Address(binary.LittleEndian.Uint64(m.bl[8:]))
 }
 
 func (m meta) getLastDataBlock() (data, error) {
@@ -147,16 +147,16 @@ func (m meta) firstLastDataBlock() (data, error) {
 }
 
 func (m meta) blockSize() uint16 {
-	return binary.BigEndian.Uint16(m.bl[24:])
+	return binary.LittleEndian.Uint16(m.bl[24:])
 }
 
 func (m meta) setFirstDataBlock(a store.Address) error {
-	binary.BigEndian.PutUint64(m.bl, a.UInt64())
+	binary.LittleEndian.PutUint64(m.bl, a.UInt64())
 	return m.m.Touch(m.addr)
 }
 
 func (m meta) setLastDataBlock(a store.Address) error {
-	binary.BigEndian.PutUint64(m.bl[8:], a.UInt64())
+	binary.LittleEndian.PutUint64(m.bl[8:], a.UInt64())
 	return m.m.Touch(m.addr)
 }
 

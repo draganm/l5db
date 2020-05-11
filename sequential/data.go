@@ -78,28 +78,28 @@ func (d data) payload() []byte {
 }
 
 func (d data) dataSize() uint16 {
-	return binary.BigEndian.Uint16(d.bl[8:])
+	return binary.LittleEndian.Uint16(d.bl[8:])
 }
 
 func (d data) increaseDataSize(delta uint16) error {
 	nds := d.dataSize() + delta
-	binary.BigEndian.PutUint16(d.bl[8:], nds)
+	binary.LittleEndian.PutUint16(d.bl[8:], nds)
 	return d.m.Touch(d.addr)
 }
 
 func (d data) remainingCapacity() (int, int) {
-	stored := int(binary.BigEndian.Uint16(d.bl[8:]))
+	stored := int(binary.LittleEndian.Uint16(d.bl[8:]))
 	total := len(d.bl) - dataHeaderSize
 
 	return total - stored, dataHeaderSize + stored
 }
 
 func (d data) nextBlockAddress() store.Address {
-	return store.Address(binary.BigEndian.Uint64(d.bl))
+	return store.Address(binary.LittleEndian.Uint64(d.bl))
 }
 
 func (d data) setNextBlockAddress(a store.Address) error {
-	binary.BigEndian.PutUint64(d.bl, a.UInt64())
+	binary.LittleEndian.PutUint64(d.bl, a.UInt64())
 	return d.m.Touch(d.addr)
 }
 

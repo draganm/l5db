@@ -74,7 +74,7 @@ func loadInternalNode(m store.Memory, a store.Address, t byte, keySizeHint uint1
 		if len(d) < 2 {
 			return internalNode{}, errors.New("btree internalNode malformated: not enough bytes for key length")
 		}
-		l := int(binary.BigEndian.Uint16(d))
+		l := int(binary.LittleEndian.Uint16(d))
 		d = d[2:]
 
 		if len(d) < l {
@@ -89,7 +89,7 @@ func loadInternalNode(m store.Memory, a store.Address, t byte, keySizeHint uint1
 		}
 
 		kvs[i].key = copyByteSlice(k)
-		kvs[i].value = store.Address(binary.BigEndian.Uint64(d))
+		kvs[i].value = store.Address(binary.LittleEndian.Uint64(d))
 		d = d[8:]
 	}
 
@@ -99,7 +99,7 @@ func loadInternalNode(m store.Memory, a store.Address, t byte, keySizeHint uint1
 		if len(d) < 8 {
 			return internalNode{}, errors.New("btree internalNode malformated: not enough bytes for child address")
 		}
-		children[i] = store.Address(binary.BigEndian.Uint64(d))
+		children[i] = store.Address(binary.LittleEndian.Uint64(d))
 		d = d[8:]
 	}
 
@@ -270,16 +270,16 @@ func (i *internalNode) store() error {
 	d = d[1:]
 
 	for _, kv := range i.kvs {
-		binary.BigEndian.PutUint16(d, uint16(len(kv.key)))
+		binary.LittleEndian.PutUint16(d, uint16(len(kv.key)))
 		d = d[2:]
 		copy(d, kv.key)
 		d = d[len(kv.key):]
-		binary.BigEndian.PutUint64(d, kv.value.UInt64())
+		binary.LittleEndian.PutUint64(d, kv.value.UInt64())
 		d = d[8:]
 	}
 
 	for _, c := range i.children {
-		binary.BigEndian.PutUint64(d, c.UInt64())
+		binary.LittleEndian.PutUint64(d, c.UInt64())
 		d = d[8:]
 	}
 

@@ -34,7 +34,7 @@ func Open(dir string, maxSize int) (*Store, error) {
 
 	if currentSize == 0 {
 		header := make([]byte, 16)
-		binary.BigEndian.PutUint64(header, 16)
+		binary.LittleEndian.PutUint64(header, 16)
 		_, err = f.Write(header)
 		if err != nil {
 			return nil, errors.Wrapf(err, "while appending header to %s", storeFileName)
@@ -122,7 +122,7 @@ func (s *Store) Allocate(size int, t BlockType) (Address, []byte, error) {
 	}
 
 	// DON'T REMOVE: write new NFA
-	binary.BigEndian.PutUint64(s.mm[:8], end)
+	binary.LittleEndian.PutUint64(s.mm[:8], end)
 
 	s.mm[nfa] = byte(bits)
 	s.mm[nfa+1] = byte(t)
@@ -132,7 +132,7 @@ func (s *Store) Allocate(size int, t BlockType) (Address, []byte, error) {
 }
 
 func (s *Store) nextFreeAddress() Address {
-	return Address(binary.BigEndian.Uint64(s.mm[:8]))
+	return Address(binary.LittleEndian.Uint64(s.mm[:8]))
 }
 
 func (s *Store) GetBlock(addr Address) ([]byte, BlockType, error) {
@@ -176,10 +176,10 @@ type Memory interface {
 }
 
 func (s *Store) GetRootAddress() Address {
-	return Address(binary.BigEndian.Uint64(s.mm[8:]))
+	return Address(binary.LittleEndian.Uint64(s.mm[8:]))
 }
 
 func (s *Store) SetRootAddress(a Address) error {
-	binary.BigEndian.PutUint64(s.mm[8:], a.UInt64())
+	binary.LittleEndian.PutUint64(s.mm[8:], a.UInt64())
 	return nil
 }
