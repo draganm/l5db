@@ -63,7 +63,7 @@ We have chosen to store length of the block as a power of 2.
 This has the advantage of a very compact representation of the block length (only one byte)
 and will enable us to implement buddy algorithm for allocation (subject of one of the following RFCs).
 
-The down side of using of a power of 2 for the block length is that space will be wasted when the data is just a byte or two larger than available in smaller block. 
+The downside of using a power of 2 for the block length is that space will be wasted when the data is just a byte or two larger than available in smaller block.
 Worst case scenario would be up to 50% of unused data in a block.
 On average this waste should be around 25% given a even distribution of data length.
 
