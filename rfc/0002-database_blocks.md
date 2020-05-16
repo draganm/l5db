@@ -39,7 +39,7 @@ Here we describe how we are splitting the big memory-mapped file into smaller pi
 
 ## Structure of a block
 
-Every block has it's address, which is the offset of the first byte of the block relative to the beginning of the memory-mapped file.
+Every block has its address, which is the offset of the first byte of the block relative to the beginning of the memory-mapped file.
 
 Every block consists of a header (2 bytes) and payload.
 
