@@ -29,7 +29,7 @@ Just having one big piece of memory is not very useful for storing a B-Tree, sin
 
 Memory mapped file enables us keep more data in our database than can be fitted into available RAM.
 Still, the available space will be exhausted really quickly if we don't have a strategy for allocating and re-using de-allocated parts of the file
-At the same time we should avoiding as much as possible memory fragmentation.
+At the same time, we should be avoiding memory fragmentation as much as possible.
 Introducing blocks help with with task by fitting nicely into a buddy memory allocator method [1], that is also used by the Linux kernel.
 
 # Design
